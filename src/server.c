@@ -3,6 +3,50 @@
 #include <string.h>
 #include <winsock2.h>
 
+void parse_request(char *request) {
+    char method[16];
+    char path[2048];
+    char version[16];
+    char host[256];
+    int port = 80;
+
+    method[0] = '\0';
+    path[0] = '\0';
+    version[0] = '\0';
+    host[0] = '\0';
+
+    sscanf(request, "%15s %2047s %15s", method, path, version);
+
+    char *host_line = strstr(request, "\nHost:");
+
+    if (host_line == NULL)
+        host_line = strstr(request, "\nhost:");
+
+    if (host_line != NULL) {
+        host_line += 6;
+
+        while (*host_line == ' ')
+            host_line++;
+
+        sscanf(host_line, "%255s", host);
+
+        char *colon = strchr(host, ':');
+
+        if (colon != NULL) {
+            *colon = '\0';
+            port = atoi(colon + 1);
+        }
+    }
+
+    printf("\nParsed HTTP Request\n");
+    printf("-------------------\n");
+    printf("Method : %s\n", method);
+    printf("Path   : %s\n", path);
+    printf("Host   : %s\n", host);
+    printf("Port   : %d\n", port);
+    printf("-------------------\n");
+}
+
 int main() {
     WSADATA wsa;
     SOCKET server_socket, client_socket;
@@ -61,6 +105,8 @@ int main() {
 
         printf("\nReceived request:\n");
         printf("%s\n", buffer);
+
+        parse_request(buffer);
 
         const char *response =
             "HTTP/1.1 200 OK\r\n"
