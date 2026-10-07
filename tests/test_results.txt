@@ -1,0 +1,45 @@
+Proxy Server Integration Test Results
+Date: 2026-10-07
+
+TC01 — Proxy startup
+Result: PASS
+The proxy started successfully and listened on port 8080.
+
+TC02 — Client connection
+Result: PASS
+A client successfully connected to the proxy on 127.0.0.1:8080.
+
+TC03 — HTTP GET / destination forwarding
+Result: FAIL
+The proxy received and parsed the HTTP GET request successfully, but the destination connection failed for example.com during the first test. Direct access to example.com without the proxy succeeded.
+
+TC04 — Destination connection
+Result: PASS
+The proxy successfully connected to example.com:80 during the successful HTTP GET test.
+
+TC05 — Response forwarding
+Result: PASS
+The proxy successfully received the destination response and forwarded it to the client.
+
+TC06 — Invalid destination
+Result: PASS
+The proxy correctly detected DNS resolution failure for a non-existent domain and reported that it could not connect to the destination server.
+
+TC07 — Different URL/path
+Result: PASS
+The proxy successfully processed /test, connected to example.com:80, sent the request, received the response, and forwarded the response to the client.
+
+TC08 — Cache HIT/MISS
+Result: FAIL / NOT VERIFIED
+Repeated requests to the same URL were both forwarded to the destination server. No cache HIT/MISS behavior was observed in the server output.
+
+TC09 — Connection failure
+Result: PASS
+The proxy correctly handled a connection failure to 127.0.0.1:9999 and reported that it could not connect to the destination server.
+
+Summary:
+PASS: 7
+FAIL / NOT VERIFIED: 2
+
+Failed/Not Verified:
+TC03, TC08

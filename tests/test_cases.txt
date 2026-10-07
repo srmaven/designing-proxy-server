@@ -1,0 +1,26 @@
+TC01 — Proxy startup
+Expected: Proxy starts successfully on port 8080.
+
+TC02 — Client connection
+Expected: Client connects successfully to the proxy.
+
+TC03 — HTTP GET
+Expected: GET request is received and parsed correctly.
+
+TC04 — Destination connection
+Expected: Proxy connects successfully to the destination server.
+
+TC05 — Response forwarding
+Expected: Destination response reaches the client through the proxy.
+
+TC06 — Invalid destination
+Expected: Proxy handles a failed destination connection appropriately.
+
+TC07 — Different URL/path
+Expected: Different HTTP paths are forwarded correctly.
+
+TC08 — Cache HIT/MISS
+Expected: First request results in MISS; repeated request results in HIT.
+
+TC09 — Connection failure
+Expected: Destination unavailable is handled with an appropriate failure.
