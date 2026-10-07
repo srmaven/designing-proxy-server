@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <winsock2.h>
+#include "http.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -164,15 +165,25 @@ int main() {
 
         printf("\nReceived request:\n");
         printf("%s\n", buffer);
+        
+        HttpRequest http_request;
+
+    if (http_parse_request(buffer, &http_request) != 0) {
+    printf("HTTP request parsing failed.\n");
+    closesocket(client_socket);
+    closesocket(server_socket);
+    WSACleanup();
+    return 1;
+    }
 
         parse_request(
-            buffer,
-            method,
-            path,
-            host,
-            &port
+           buffer,
+           method,
+           path,
+           host,
+           &port
         );
-
+    
         printf("\nParsed Request\n");
         printf("-------------------\n");
         printf("Method : %s\n", method);
