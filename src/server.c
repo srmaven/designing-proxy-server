@@ -3,6 +3,7 @@
 #include <string.h>
 #include <winsock2.h>
 #include "http.h"
+#include "cache.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -105,6 +106,12 @@ int main() {
         printf("WSAStartup failed\n");
         return 1;
     }
+    if (cache_init() != 0) {
+        printf("Cache initialization failed\n");
+        WSACleanup();
+        return 1;
+    }
+    printf("Cache initialized.\n");
 
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -183,14 +190,47 @@ int main() {
            host,
            &port
         );
+
+        char cache_key[2304];
+
+        snprintf(
+          cache_key,
+          sizeof(cache_key),
+          "%s:%d%s",
+          host,
+          port,
+          path
+        );
+
+        const char *cached_response = cache_get(cache_key);
+
+        if (cached_response != NULL) {
+           printf("Cache HIT\n");
+
+           send(
+           client_socket,
+           cached_response,
+           (int)strlen(cached_response),
+           0
+        );
+
+        closesocket(client_socket);
+        closesocket(server_socket);
+        WSACleanup();
+
+       return 0;
+    }
+
+    printf("Cache MISS\n");
+        
     
-        printf("\nParsed Request\n");
-        printf("-------------------\n");
-        printf("Method : %s\n", method);
-        printf("Path   : %s\n", path);
-        printf("Host   : %s\n", host);
-        printf("Port   : %d\n", port);
-        printf("-------------------\n");
+    printf("\nParsed Request\n");
+    printf("-------------------\n");
+    printf("Method : %s\n", method);
+    printf("Path   : %s\n", path);
+    printf("Host   : %s\n", host);
+    printf("Port   : %d\n", port);
+    printf("-------------------\n");
 
         printf("\nConnecting to destination server...\n");
 
@@ -233,22 +273,53 @@ int main() {
 
         int response_size;
 
-        while ((response_size = recv(
-            destination_socket,
-            buffer,
-            sizeof(buffer),
-            0
-        )) > 0) {
-            send(
-                client_socket,
-                buffer,
-                response_size,
-                0
-            );
-        }
+        char cached_data[CACHE_DATA_SIZE];
+        int total_response = 0;
+        int cacheable = 1;
 
-        printf("Response received from destination server.\n");
-        printf("Response sent to client.\n");
+        while ((response_size = recv(
+         destination_socket,
+         buffer,
+         sizeof(buffer),
+         0
+        )) > 0) {
+
+        send(
+           client_socket,
+           buffer,
+           response_size,
+           0
+        );
+
+        if (cacheable) {
+            if (total_response + response_size < CACHE_DATA_SIZE) {
+
+              memcpy(
+                cached_data + total_response,
+                buffer,
+                response_size
+              );
+
+              total_response += response_size;
+              cached_data[total_response] = '\0';
+
+            } else {
+              cacheable = 0;
+            }
+        }
+    }  
+
+    if (cacheable && total_response > 0) {
+
+     if (cache_put(cache_key, cached_data) == 0) {
+        printf("Response stored in cache.\n");
+     } else {
+        printf("Failed to store response in cache.\n");
+     }
+    }
+
+    printf("Response received from destination server.\n");
+    printf("Response sent to client.\n");
 
         closesocket(destination_socket);
     }
