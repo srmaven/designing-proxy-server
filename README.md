@@ -2,94 +2,117 @@
 
 ## Team Members
 
-| Name | Roll No. |
-|---|---|
-| **Swayam Ranjan Mohanty** | **2405167** |
-| **Sai Arpit Panda** | **2405145** |
-| **Subhra Prakash Sahoo** | **2405164** |
-| **Aniket Kumar Dalai** | **24051908** |
+| **Name**                  | **Roll No.** |
+| ------------------------- | ------------ |
+| **Swayam Ranjan Mohanty** | **2405167**  |
+| **Sai Arpit Panda**       | **2405145**  |
+| **Subhra Prakash Sahoo**  | **2405164**  |
+| **Aniket Kumar Dalai**    | **24051908** |
 
 ## 1. Project Overview
 
-The **Proxy Server** project implements an intermediary server that sits between clients and their intended internet destinations.
+The **Designing a Proxy Server** project implements an HTTP proxy server that acts as an intermediary between a client and a destination server.
 
-The proxy receives client requests, processes them, forwards valid requests to the destination server, receives the response, and sends it back to the client.
+The proxy receives an HTTP request from a client, parses and validates the request, applies access-control rules, checks the cache, forwards valid cache-miss requests to the destination server, receives the response, and forwards the response back to the client.
 
-The project demonstrates practical concepts of **Computer Networks, HTTP communication, concurrent connections, caching, access control, traffic logging, and performance measurement**.
+The project demonstrates practical concepts of **Computer Networks, TCP socket programming, HTTP communication, request and response forwarding, caching, access control, traffic logging, and error handling**.
 
 ## 2. Project Objective
 
-The main objective is to design and implement a functional proxy server capable of handling real client requests while providing additional traffic-management features.
+The main objective of the project is to design and implement a functional HTTP proxy server using C and socket programming.
 
 The system focuses on:
 
-- Handling multiple clients simultaneously.
-- Processing and forwarding HTTP requests.
+- Accepting client connections.
+- Processing HTTP requests.
+- Validating HTTP request information.
+- Applying domain access-control rules.
+- Forwarding HTTP requests to destination servers.
+- Receiving and forwarding HTTP responses.
 - Implementing response caching.
-- Providing access-control mechanisms.
-- Maintaining useful traffic logs.
-- Handling malformed requests and unreachable destinations.
-- Measuring the performance overhead introduced by the proxy.
+- Maintaining traffic logs.
+- Handling invalid requests and connection failures.
+- Supporting repeated client connections.
 
 ## 3. System Architecture
 
 ```text
-                 Client 1
-                    |
-                 Client 2
-                    |
-                 Client 3
-                    |
-                    v
-            +----------------+
-            |  Proxy Server  |
-            +----------------+
-              |     |      |
-              |     |      |
-          Cache   Filter   Logger
-              |
-              v
-       Destination Server
-              |
-              v
-          HTTP Response
-              |
-              v
-         Proxy Server
-              |
-              v
-            Clients
+                 Client
+                   |
+                   | HTTP Request
+                   v
+          +-------------------+
+          |   Proxy Server    |
+          +-------------------+
+             |      |      |
+             |      |      |
+          Access   Cache  Logger
+          Control    |
+             |       |
+             +-------+
+                 |
+           Cache Miss
+                 |
+                 v
+        +-------------------+
+        | Destination Server|
+        +-------------------+
+                 |
+                 | HTTP Response
+                 v
+          +-------------------+
+          |   Proxy Server    |
+          +-------------------+
+                 |
+                 | HTTP Response
+                 v
+               Client
 ```
 
-The proxy server acts as an intermediary between clients and destination servers.
+The proxy server acts as an intermediary between the client and the destination server.
 
 ## 4. Key Features
 
-- **Multi-Client Support** — Handles multiple simultaneous client connections.
-- **HTTP Request Forwarding** — Receives and forwards HTTP requests to the intended destination.
-- **Response Caching** — Stores suitable responses and serves them from cache when applicable.
-- **Access Control** — Supports rules for restricting specific domains/URLs or controlling client access.
-- **Traffic Logging** — Records useful information about requests and responses.
-- **Error Handling** — Handles malformed requests, unreachable destinations, and connection failures.
-- **Performance Measurement** — Measures latency and throughput with and without the proxy.
+### HTTP Request Forwarding
+
+The proxy receives HTTP requests from clients, parses the request information, connects to the destination server, and forwards the request.
+
+### Response Caching
+
+The proxy stores suitable destination responses in memory. A repeated request for the same resource can be served directly from the cache.
+
+### Access Control
+
+The proxy checks requested domains against access-control rules and blocks configured domains.
+
+### Traffic Logging
+
+The proxy records important runtime events such as client connections, requests, cache activity, destination connections, and response forwarding.
+
+### Error Handling
+
+The proxy handles invalid requests, invalid hosts, blocked domains, destination connection failures, and other connection errors without terminating the server unexpectedly.
+
+### Multiple Client Connections
+
+The proxy remains active after completing a client request and can accept subsequent client connections.
 
 ## 5. Computer Networks Concepts
 
-The project demonstrates:
+The project demonstrates the following Computer Networks concepts:
 
 - Client-Server Architecture
 - Proxy Servers
 - HTTP Communication
 - TCP/IP Networking
 - Socket Programming
-- Concurrent Connections
 - Request and Response Handling
 - Caching
 - Access Control
 - Traffic Logging
-- Network Latency
-- Throughput
 - Error Handling
+- DNS Resolution
+- TCP Connections
 
 ## 6. Proxy Workflow
 
@@ -100,7 +123,11 @@ Client
   v
 Proxy Server
   |
+  +---- Validate HTTP Request
+  |
   +---- Check Access Control
+  |       |
+  |       +---- Blocked ----> HTTP 403 Response
   |
   +---- Check Cache
   |       |
@@ -109,31 +136,86 @@ Proxy Server
   +---- Cache Miss
           |
           v
-   Destination Server
+   Connect to Destination
           |
-          | HTTP Response
           v
-      Proxy Server
+   Forward HTTP Request
+          |
+          v
+   Receive HTTP Response
           |
           +---- Store Response in Cache
           |
           v
-        Client
+   Forward Response to Client
 ```
 
-## 7. Caching
+## 7. HTTP Request Parsing
 
-The proxy maintains a cache of previously received responses.
+The project contains an HTTP parser module that extracts and validates information from incoming HTTP requests.
 
-### Cache Hit
-If a requested resource is available and valid in the cache, the proxy can return the cached response without contacting the destination server.
+The parser is used to process request information such as:
+
+- HTTP method
+- Request target
+- Host information
+- Port information
+- HTTP request format
+
+Invalid or malformed requests are rejected instead of being forwarded to the destination server.
+
+## 8. Caching
+
+The proxy implements an in-memory response cache.
 
 ### Cache Miss
-If the resource is not available in the cache or needs to be refreshed, the proxy forwards the request to the destination server and may store the received response for future requests.
 
-## 8. Access Control
+When a requested resource is not available in the cache:
 
-The proxy includes an access-control mechanism that can restrict access to selected domains or URLs.
+```text
+Client
+  |
+  v
+Proxy
+  |
+  | Cache MISS
+  v
+Destination Server
+  |
+  v
+Response
+  |
+  +---- Store in Cache
+  |
+  v
+Client
+```
+
+### Cache Hit
+
+When the requested resource is already available in the cache:
+
+```text
+Client
+  |
+  v
+Proxy
+  |
+  | Cache HIT
+  v
+Cached Response
+  |
+  v
+Client
+```
+
+The implementation also handles cache-size limitations for responses that are too large to store.
+
+## 9. Access Control
+
+The proxy includes a domain-based access-control mechanism.
+
+Configured blocked domains are rejected before cache lookup and destination-server communication.
 
 ```text
 Client Request
@@ -141,112 +223,239 @@ Client Request
       v
 Access Control Check
       |
-   +--+--+
-   |     |
-Allowed Blocked
-   |     |
-   v     v
-Forward  Reject
+   +--+------+
+   |         |
+Allowed    Blocked
+   |         |
+   v         v
+Continue   HTTP 403
+Processing Response
 ```
 
-## 9. Concurrent Connections
+The access-control module also handles cases such as case differences, subdomains, trailing dots, and invalid input.
 
-The proxy is designed to support multiple clients simultaneously. A client request should not prevent other clients from communicating with the proxy.
+## 10. Multi-Client Support
 
-Concurrency can be implemented using:
+The proxy server uses a persistent server loop so that it can continue accepting client connections after completing a request.
 
-- Threads
-- Processes
-- Asynchronous I/O
+```text
+Start Proxy
+     |
+     v
+Accept Client 1
+     |
+     v
+Process Request
+     |
+     v
+Close Client 1
+     |
+     v
+Accept Client 2
+     |
+     v
+Process Request
+     |
+     v
+Continue...
+```
 
-The final implementation will use the approach selected by the team.
+The current implementation supports **repeated client connections**. It does not currently implement thread-based or process-based simultaneous client handling.
 
-## 10. Traffic Logging
+## 11. Traffic Logging
 
-The proxy records useful traffic information for monitoring and debugging, such as:
+The project includes a logging module for recording important runtime events.
 
-- Client address
-- Requested URL
-- Request method
-- Destination server
-- Request status
-- Response time
-- Cache hit/miss status
-- Access-control result
+The logs can include information related to:
 
-## 11. Error Handling
+- Server startup
+- Client connections
+- HTTP requests
+- Cache MISS events
+- Cache HIT events
+- Destination connections
+- Request forwarding
+- Response forwarding
+- Cache storage
+- Access-control decisions
+- Errors
 
-The proxy should handle common failures without crashing, including:
+Logging is useful for debugging, monitoring, and understanding the proxy's execution flow.
+
+## 12. Error Handling
+
+The proxy handles common errors without unexpectedly terminating the server.
+
+The implementation includes handling for:
 
 - Malformed HTTP requests
+- Invalid Host information
+- Blocked domains
+- Invalid destination hosts
+- Destination connection failures
+- Client connection failures
+- Socket errors
+
+The proxy returns appropriate HTTP error responses for supported error conditions, including:
+
+- **400 Bad Request**
+- **403 Forbidden**
+- **502 Bad Gateway**
+
+## 13. Technologies Used
+
+The project uses:
+
+- **C**
+- **TCP Socket Programming**
+- **Winsock2**
+- **HTTP**
+- **TCP/IP**
+- **Git**
+- **GitHub**
+- **GCC / MinGW**
+
+The main project modules include:
+
+```text
+src/
+├── server.c
+├── client.c
+├── http.c
+├── http.h
+├── cache.c
+├── cache.h
+├── logger.c
+├── logger.h
+├── access_control.c
+└── access_control.h
+```
+
+## 14. Testing
+
+The project includes both module-level and integrated proxy testing.
+
+Testing covers:
+
+- Proxy startup
+- Client connection
+- HTTP request forwarding
+- Destination-server connection
+- Response forwarding
 - Invalid destinations
-- Unreachable servers
-- Connection timeouts
-- Client disconnections
-- Invalid requests
+- Different URL paths
+- Cache MISS
+- Cache HIT
+- Connection failure handling
+- Logger integration
+- Access-control rules
+- Invalid Host handling
+- HTTP parser tests
+- Cache tests
+- Access-control tests
+- Large-response forwarding
+- Repeated client connections
 
-## 12. Performance Analysis
+The detailed test results are available in:
 
-The project will compare direct communication with communication through the proxy.
+```text
+tests/test_results.txt
+```
 
-The analysis will consider:
+Additional testing information is available in:
 
-- Request latency
-- Response latency
-- Throughput
-- Cache-hit performance
-- Cache-miss performance
-- Proxy processing overhead
+```text
+docs/testing.md
+```
 
-## 13. Technologies
+## 15. Demonstrated Cache Behavior
 
-The final implementation may use:
+The integrated proxy was tested using repeated requests for the same resource.
 
-- C
-- Socket Programming
-- HTTP
-- TCP/IP
-- Multithreading or asynchronous networking
-- File-based or in-memory caching
-- Git & GitHub
+The first request resulted in:
 
-The exact implementation technologies and libraries will be finalized during development.
+```text
+Cache MISS
+```
 
-## 14. AI Tools Used
+The response was received from the destination server and stored in the cache.
 
-AI tools may be used during development for **learning, debugging, code assistance, documentation, brainstorming, and understanding networking concepts**.
+A subsequent request for the same resource resulted in:
 
-### Tools
+```text
+Cache HIT
+```
 
-- **ChatGPT** — Concept clarification, debugging assistance, code guidance, documentation, and project planning.
-- **GitHub Copilot** — Code completion, boilerplate generation, and development assistance.
+and the cached response was returned directly to the client.
 
-AI-generated suggestions will be reviewed, tested, and modified by the team before being incorporated into the project.
+## 16. Project Limitations
 
-## 15. Demonstration
+The current implementation has the following limitations:
 
-The final demonstration will include:
+- The proxy currently supports HTTP request forwarding.
+- HTTPS `CONNECT` tunneling is not implemented.
+- The current multi-client implementation accepts repeated client connections but does not provide true simultaneous thread-based or process-based concurrency.
+- The cache is an in-memory cache with a limited storage capacity.
+- The current access-control rules contain a predefined set of blocked domains.
+
+## 17. AI Tools Used
+
+AI tools were used during development for:
+
+- Learning networking concepts
+- Understanding socket programming
+- Debugging
+- Code assistance
+- Understanding project requirements
+- Documentation assistance
+- Test planning
+- Project organization
+
+### Tools Used
+
+- **ChatGPT** — Concept clarification, debugging assistance, code guidance, documentation, testing guidance, and project planning.
+- **GitHub Copilot** — Code completion and development assistance.
+
+AI-generated suggestions were reviewed, tested, and modified by the team before being incorporated into the project.
+
+## 18. Project Demonstration
+
+The final demonstration can include:
 
 1. Starting the proxy server.
-2. Connecting multiple clients.
-3. Sending normal HTTP requests.
-4. Demonstrating request forwarding.
-5. Demonstrating a cache miss.
-6. Demonstrating a cache hit.
-7. Demonstrating an access-control rule.
-8. Showing traffic logs.
-9. Demonstrating error handling.
-10. Comparing performance with and without the proxy.
+2. Connecting a client to the proxy.
+3. Sending an HTTP request.
+4. Demonstrating destination-server connection.
+5. Demonstrating HTTP request and response forwarding.
+6. Demonstrating a cache MISS.
+7. Demonstrating a cache HIT.
+8. Demonstrating an allowed domain.
+9. Demonstrating a blocked domain.
+10. Showing proxy logs.
+11. Demonstrating invalid-request handling.
+12. Demonstrating destination connection failure handling.
+13. Demonstrating repeated client connections.
 
-## 16. Expected Outcome
+## 19. Expected Outcome
 
-The final system will demonstrate a working proxy server capable of acting as an intermediary between clients and destination servers while providing **request forwarding, caching, access control, logging, concurrent connection handling, error handling, and performance analysis**.
+The completed project demonstrates a functional HTTP proxy server capable of acting as an intermediary between clients and destination servers.
 
-## 17. Project Information
+The implemented system provides:
+
+- HTTP request parsing
+- HTTP request forwarding
+- HTTP response forwarding
+- Response caching
+- Cache HIT/MISS handling
+- Domain access control
+- Traffic logging
+- Error handling
+- Repeated client connection support
+- TCP socket-based communication
+
+## 20. Project Information
 
 **Course:** Computer Networks  
 **Project Type:** Mini Project  
 **Project Title:** Designing a Proxy Server  
 **Team Size:** 4 Members
-# designing-proxy-server
-Computer Networks Mini Project - Designing a Proxy Server
