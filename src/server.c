@@ -4,6 +4,7 @@
 #include <winsock2.h>
 #include "http.h"
 #include "cache.h"
+#include "logger.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -112,6 +113,7 @@ int main() {
         return 1;
     }
     printf("Cache initialized.\n");
+    log_info("Cache initialized");
 
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -144,6 +146,7 @@ int main() {
     }
 
     printf("Proxy server listening on port 8080...\n");
+    log_info("Proxy server listening on port 8080");
 
     client_socket = accept(
         server_socket,
@@ -159,6 +162,7 @@ int main() {
     }
 
     printf("Client connected.\n");
+    log_info("Client connected");
 
     int received = recv(
         client_socket,
@@ -190,6 +194,7 @@ int main() {
            host,
            &port
         );
+        log_request(method, path, host);
 
         char cache_key[2304];
 
@@ -206,6 +211,7 @@ int main() {
 
         if (cached_response != NULL) {
            printf("Cache HIT\n");
+           log_info("Cache HIT");
 
            send(
            client_socket,
@@ -222,6 +228,7 @@ int main() {
     }
 
     printf("Cache MISS\n");
+    log_info("Cache MISS");
         
     
     printf("\nParsed Request\n");
@@ -247,6 +254,7 @@ int main() {
         }
 
         printf("Connected to %s:%d\n", host, port);
+        log_info("Connected to destination server");
 
         char request_to_server[8192];
 
@@ -270,6 +278,7 @@ int main() {
         );
 
         printf("Request sent to destination server.\n");
+        log_info("Request sent to destination server");
 
         int response_size;
 
@@ -313,6 +322,7 @@ int main() {
 
      if (cache_put(cache_key, cached_data) == 0) {
         printf("Response stored in cache.\n");
+        log_info("Response stored in cache");
      } else {
         printf("Failed to store response in cache.\n");
      }
@@ -320,6 +330,8 @@ int main() {
 
     printf("Response received from destination server.\n");
     printf("Response sent to client.\n");
+    log_info("Response received from destination server");
+    log_info("Response sent to client");
 
         closesocket(destination_socket);
     }
