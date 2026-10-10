@@ -45,11 +45,12 @@ SOCKET connect_to_server(char *host, int port) {
     SOCKET destination_socket;
     struct sockaddr_in server_addr;
     struct hostent *server;
-    
+
     destination_socket = socket(AF_INET, SOCK_STREAM, 0);
 
     if (destination_socket == INVALID_SOCKET) {
         printf("Destination socket creation failed\n");
+        log_error("Destination socket creation failed");
         return INVALID_SOCKET;
     }
 
@@ -57,6 +58,7 @@ SOCKET connect_to_server(char *host, int port) {
 
     if (server == NULL) {
         printf("DNS resolution failed for %s\n", host);
+        log_error("DNS resolution failed");
         closesocket(destination_socket);
         return INVALID_SOCKET;
     }
@@ -78,6 +80,7 @@ SOCKET connect_to_server(char *host, int port) {
         sizeof(server_addr)
     ) == SOCKET_ERROR) {
         printf("Connection to destination server failed\n");
+        log_error("Connection to destination server failed");
         closesocket(destination_socket);
         return INVALID_SOCKET;
     }
@@ -94,7 +97,7 @@ int main() {
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
 
-    int client_len = sizeof(client_addr);
+    int client_len;
 
     char buffer[8192];
     char method[16];
@@ -105,13 +108,17 @@ int main() {
 
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
         printf("WSAStartup failed\n");
+        log_error("WSAStartup failed");
         return 1;
     }
+
     if (cache_init() != 0) {
         printf("Cache initialization failed\n");
+        log_error("Cache initialization failed");
         WSACleanup();
         return 1;
     }
+
     printf("Cache initialized.\n");
     log_info("Cache initialized");
 
@@ -119,6 +126,7 @@ int main() {
 
     if (server_socket == INVALID_SOCKET) {
         printf("Socket creation failed\n");
+        log_error("Proxy socket creation failed");
         WSACleanup();
         return 1;
     }
@@ -133,6 +141,7 @@ int main() {
         sizeof(server_addr)
     ) == SOCKET_ERROR) {
         printf("Bind failed\n");
+        log_error("Proxy bind failed");
         closesocket(server_socket);
         WSACleanup();
         return 1;
@@ -140,6 +149,7 @@ int main() {
 
     if (listen(server_socket, 5) == SOCKET_ERROR) {
         printf("Listen failed\n");
+        log_error("Proxy listen failed");
         closesocket(server_socket);
         WSACleanup();
         return 1;
@@ -148,96 +158,101 @@ int main() {
     printf("Proxy server listening on port 8080...\n");
     log_info("Proxy server listening on port 8080");
 
-    client_socket = accept(
-        server_socket,
-        (struct sockaddr*)&client_addr,
-        &client_len
-    );
+    while (1) {
 
-    if (client_socket == INVALID_SOCKET) {
-        printf("Accept failed\n");
-        closesocket(server_socket);
-        WSACleanup();
-        return 1;
-    }
+        client_len = sizeof(client_addr);
 
-    printf("Client connected.\n");
-    log_info("Client connected");
+        client_socket = accept(
+            server_socket,
+            (struct sockaddr*)&client_addr,
+            &client_len
+        );
 
-    int received = recv(
-        client_socket,
-        buffer,
-        sizeof(buffer) - 1,
-        0
-    );
+        if (client_socket == INVALID_SOCKET) {
+            printf("Accept failed\n");
+            log_error("Client accept failed");
+            continue;
+        }
 
-    if (received > 0) {
+        printf("Client connected.\n");
+        log_info("Client connected");
+
+        int received = recv(
+            client_socket,
+            buffer,
+            sizeof(buffer) - 1,
+            0
+        );
+
+        if (received <= 0) {
+            printf("Failed to receive HTTP request.\n");
+            log_error("Failed to receive HTTP request");
+            closesocket(client_socket);
+            continue;
+        }
+
         buffer[received] = '\0';
 
         printf("\nReceived request:\n");
         printf("%s\n", buffer);
-        
+
         HttpRequest http_request;
 
-    if (http_parse_request(buffer, &http_request) != 0) {
-    printf("HTTP request parsing failed.\n");
-    closesocket(client_socket);
-    closesocket(server_socket);
-    WSACleanup();
-    return 1;
-    }
+        if (http_parse_request(buffer, &http_request) != 0) {
+            printf("HTTP request parsing failed.\n");
+            log_error("HTTP request parsing failed");
+            closesocket(client_socket);
+            continue;
+        }
 
         parse_request(
-           buffer,
-           method,
-           path,
-           host,
-           &port
+            buffer,
+            method,
+            path,
+            host,
+            &port
         );
+
         log_request(method, path, host);
 
         char cache_key[2304];
 
         snprintf(
-          cache_key,
-          sizeof(cache_key),
-          "%s:%d%s",
-          host,
-          port,
-          path
+            cache_key,
+            sizeof(cache_key),
+            "%s:%d%s",
+            host,
+            port,
+            path
         );
 
         const char *cached_response = cache_get(cache_key);
 
         if (cached_response != NULL) {
-           printf("Cache HIT\n");
-           log_info("Cache HIT");
+            printf("Cache HIT\n");
+            log_info("Cache HIT");
 
-           send(
-           client_socket,
-           cached_response,
-           (int)strlen(cached_response),
-           0
-        );
+            send(
+                client_socket,
+                cached_response,
+                (int)strlen(cached_response),
+                0
+            );
 
-        closesocket(client_socket);
-        closesocket(server_socket);
-        WSACleanup();
+            closesocket(client_socket);
+            continue;
+        }
 
-       return 0;
-    }
+        printf("Cache MISS\n");
+        log_info("Cache MISS");
 
-    printf("Cache MISS\n");
-    log_info("Cache MISS");
-        
-    
-    printf("\nParsed Request\n");
-    printf("-------------------\n");
-    printf("Method : %s\n", method);
-    printf("Path   : %s\n", path);
-    printf("Host   : %s\n", host);
-    printf("Port   : %d\n", port);
-    printf("-------------------\n");
+        printf("\nParsed Request\n");
+        printf("-------------------\n");
+        printf("Method : %s\n", method);
+        printf("Path   : %s\n", path);
+        printf("Host   : %s\n", host);
+        printf("Port   : %d\n", port);
+        printf("-------------------\n");
 
         printf("\nConnecting to destination server...\n");
 
@@ -245,12 +260,10 @@ int main() {
 
         if (destination_socket == INVALID_SOCKET) {
             printf("Could not connect to destination server.\n");
+            log_error("Could not connect to destination server");
 
             closesocket(client_socket);
-            closesocket(server_socket);
-            WSACleanup();
-
-            return 1;
+            continue;
         }
 
         printf("Connected to %s:%d\n", host, port);
@@ -270,12 +283,21 @@ int main() {
             host
         );
 
-        send(
+        int sent = send(
             destination_socket,
             request_to_server,
             (int)strlen(request_to_server),
             0
         );
+
+        if (sent == SOCKET_ERROR) {
+            printf("Failed to send request to destination server.\n");
+            log_error("Failed to send request to destination server");
+
+            closesocket(destination_socket);
+            closesocket(client_socket);
+            continue;
+        }
 
         printf("Request sent to destination server.\n");
         log_info("Request sent to destination server");
@@ -287,58 +309,67 @@ int main() {
         int cacheable = 1;
 
         while ((response_size = recv(
-         destination_socket,
-         buffer,
-         sizeof(buffer),
-         0
+            destination_socket,
+            buffer,
+            sizeof(buffer),
+            0
         )) > 0) {
 
-        send(
-           client_socket,
-           buffer,
-           response_size,
-           0
-        );
-
-        if (cacheable) {
-            if (total_response + response_size < CACHE_DATA_SIZE) {
-
-              memcpy(
-                cached_data + total_response,
+            int forwarded = send(
+                client_socket,
                 buffer,
-                response_size
-              );
+                response_size,
+                0
+            );
 
-              total_response += response_size;
-              cached_data[total_response] = '\0';
+            if (forwarded == SOCKET_ERROR) {
+                printf("Failed to send response to client.\n");
+                log_error("Failed to send response to client");
+                break;
+            }
 
-            } else {
-              cacheable = 0;
+            if (cacheable) {
+                if (total_response + response_size < CACHE_DATA_SIZE) {
+
+                    memcpy(
+                        cached_data + total_response,
+                        buffer,
+                        response_size
+                    );
+
+                    total_response += response_size;
+                    cached_data[total_response] = '\0';
+
+                } else {
+                    cacheable = 0;
+                }
             }
         }
-    }  
 
-    if (cacheable && total_response > 0) {
+        if (cacheable && total_response > 0) {
 
-     if (cache_put(cache_key, cached_data) == 0) {
-        printf("Response stored in cache.\n");
-        log_info("Response stored in cache");
-     } else {
-        printf("Failed to store response in cache.\n");
-     }
-    }
+            if (cache_put(cache_key, cached_data) == 0) {
+                printf("Response stored in cache.\n");
+                log_info("Response stored in cache");
+            } else {
+                printf("Failed to store response in cache.\n");
+                log_error("Failed to store response in cache");
+            }
+        }
 
-    printf("Response received from destination server.\n");
-    printf("Response sent to client.\n");
-    log_info("Response received from destination server");
-    log_info("Response sent to client");
+        printf("Response received from destination server.\n");
+        printf("Response sent to client.\n");
+
+        log_info("Response received from destination server");
+        log_info("Response sent to client");
 
         closesocket(destination_socket);
+        closesocket(client_socket);
+
+        printf("\nWaiting for next client...\n");
     }
 
-    closesocket(client_socket);
     closesocket(server_socket);
-
     WSACleanup();
 
     return 0;
