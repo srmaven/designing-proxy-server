@@ -1,5 +1,5 @@
 Proxy Server Integration Test Results
-Date: 2026-10-07
+Date: 2026-10-10
 
 TC01 — Proxy startup
 Result: PASS
@@ -10,36 +10,83 @@ Result: PASS
 A client successfully connected to the proxy on 127.0.0.1:8080.
 
 TC03 — HTTP GET / destination forwarding
-Result: FAIL
-The proxy received and parsed the HTTP GET request successfully, but the destination connection failed for example.com during the first test. Direct access to example.com without the proxy succeeded.
+Result: PASS
+The proxy successfully received and parsed the HTTP GET request, connected to example.com:80, forwarded the request, received the destination response, and returned the response to the client.
 
 TC04 — Destination connection
 Result: PASS
-The proxy successfully connected to example.com:80 during the successful HTTP GET test.
+The proxy successfully resolved example.com and connected to example.com:80.
 
 TC05 — Response forwarding
 Result: PASS
-The proxy successfully received the destination response and forwarded it to the client.
+The proxy successfully received the destination response and forwarded it to the client. The client successfully received an HTTP 200 OK response.
 
 TC06 — Invalid destination
 Result: PASS
-The proxy correctly detected DNS resolution failure for a non-existent domain and reported that it could not connect to the destination server.
+The proxy correctly handled DNS resolution failure for an invalid destination and returned an appropriate destination connection failure response.
 
 TC07 — Different URL/path
 Result: PASS
-The proxy successfully processed /test, connected to example.com:80, sent the request, received the response, and forwarded the response to the client.
+The proxy successfully processed a request with a different path, connected to example.com:80, sent the request, received the response, and forwarded the response to the client.
 
-TC08 — Cache HIT/MISS
-Result: FAIL / NOT VERIFIED
-Repeated requests to the same URL were both forwarded to the destination server. No cache HIT/MISS behavior was observed in the server output.
+TC08 — Cache MISS/HIT
+Result: PASS
+The first request resulted in a Cache MISS. The destination response was stored in the cache. A subsequent request for the same resource resulted in a Cache HIT and the cached response was returned directly to the client.
 
 TC09 — Connection failure
 Result: PASS
-The proxy correctly handled a connection failure to 127.0.0.1:9999 and reported that it could not connect to the destination server.
+The proxy correctly handled a destination connection failure and returned an appropriate 502 Bad Gateway response without crashing.
 
-Summary:
-PASS: 7
-FAIL / NOT VERIFIED: 2
+TC10 — Logger integration
+Result: PASS
+The proxy successfully generated runtime log entries for server startup, client connections, HTTP requests, cache MISS/HIT events, destination connections, request forwarding, response forwarding, and cache storage.
 
-Failed/Not Verified:
-TC03, TC08
+TC11 — Access control: allowed domain
+Result: PASS
+The proxy successfully allowed example.com and continued processing the request through the cache and destination-server flow.
+
+TC12 — Access control: blocked domain
+Result: PASS
+The proxy correctly blocked blocked.example and returned HTTP 403 Forbidden with an Access Denied response.
+
+TC13 — Access control: second blocked domain
+Result: PASS
+The proxy correctly blocked malware.test and returned HTTP 403 Forbidden with an Access Denied response.
+
+TC14 — Invalid Host
+Result: PASS
+The proxy correctly rejected a malformed Host header and returned HTTP 400 Bad Request with an Invalid Host response.
+
+TC15 — HTTP parser unit tests
+Result: PASS
+The HTTP parser module successfully passed its standalone tests.
+
+TC16 — Cache unit tests
+Result: PASS
+The cache module successfully passed tests for initial MISS, storing data, HIT, replacement behavior, and oversized-data handling.
+
+TC17 — Access control unit tests
+Result: PASS
+The access-control module passed all standalone tests, including allowed domains, blocked domains, subdomains, case-insensitive matching, trailing-dot handling, invalid input, and NULL input.
+
+TC18 — Large-response forwarding
+Result: PASS
+The proxy successfully forwarded a large response of approximately 1,000,000 bytes without unexpected truncation.
+
+TC19 — Multi-client / repeated client requests
+Result: PASS
+The proxy remained active after completing a client request and successfully accepted subsequent client connections. Cache MISS followed by Cache HIT was verified across repeated requests.
+
+TC20 — HTTPS CONNECT tunneling
+Result: NOT IMPLEMENTED
+The current implementation supports HTTP proxy forwarding but does not implement HTTPS CONNECT tunneling.
+
+Final Summary:
+
+PASS: 19
+FAIL: 0
+NOT IMPLEMENTED: 1
+
+The final regression tests confirm that the implemented HTTP proxy functionality, cache, access control, logging, error handling, and repeated-client handling are working as expected.
+
+HTTPS CONNECT tunneling is not implemented in the current project scope.
